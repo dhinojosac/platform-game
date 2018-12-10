@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"image"
 	"image/color"
 	"io"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -18,7 +20,41 @@ import (
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/pkg/errors"
 	"golang.org/x/image/colornames"
+
+	"github.com/faiface/pixel/text"
+	"github.com/golang/freetype/truetype"
 )
+
+// MARK: Load fonts
+func loadTTF(path string, size float64, origin pixel.Vec) *text.Text {
+	file, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		panic(err)
+	}
+
+	font, err := truetype.Parse(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	face := truetype.NewFace(font, &truetype.Options{
+		Size:              size,
+		GlyphCacheEntries: 1,
+	})
+
+	atlas := text.NewAtlas(face, text.ASCII)
+
+	txt := text.New(origin, atlas)
+
+	return txt
+
+}
 
 func loadAnimationSheet(sheetPath, descPath string, frameWidth float64) (sheet pixel.Picture, anims map[string][]pixel.Rect, err error) {
 	// total hack, nicely format the error at the end, so I don't have to type it every time
@@ -274,14 +310,20 @@ func run() {
 	}
 
 	cfg := pixelgl.WindowConfig{
-		Title:  "Platformer",
+		Title:  "My Platformer",
 		Bounds: pixel.R(0, 0, 1024, 768),
 		VSync:  true,
 	}
+
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
+
+	// MARK: load and set text
+	txt := loadTTF("fonts/intuitive.ttf", 20, pixel.V(0, 0))
+	fmt.Fprintf(txt, "Gopher")
+	//-_-
 
 	phys := &gopherPhys{
 		gravity:   -500,
@@ -299,8 +341,10 @@ func run() {
 
 	// hardcoded level
 	platforms := []platform{
-		{rect: pixel.R(-200, 0, 200, 2)},
-		{rect: pixel.R(-50, -34, 50, -32)},
+		{rect: pixel.R(-80, 30, 20, 33)},
+		{rect: pixel.R(-50, 0, 50, 3)},
+		{rect: pixel.R(0, -40, 100, -37)},
+		{rect: pixel.R(0, -23, 100, -20)},
 	}
 	for i := range platforms {
 		//platforms[i].color = randomNiceColor()
@@ -363,9 +407,12 @@ func run() {
 		for _, p := range platforms {
 			p.draw(imd)
 		}
-		gol.draw(imd)
+
+		// MARK: draw images
+		//gol.draw(imd)
 		anim.draw(imd, phys)
 		imd.Draw(canvas)
+		txt.Draw(canvas, pixel.IM.Scaled(txt.Orig, 4))
 
 		// stretch the canvas to the window
 		win.Clear(colornames.White)
